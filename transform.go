@@ -24,21 +24,24 @@ type MyData struct {
 	Continent     string `json:continent`
 	ASN           string `json:asn`
 	AsName        string `json:as_name`
-	AsDomain      string `json:as_domain`
+	AsDomain      string `json:"as_domain"`
 }
 
 func readAndTransformData(path string) (map[string]mmdbtype.Map, error) {
-	line_qty, err := countLinesFast(path)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("Counted", line_qty)
 
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println(err)
+		return nil, err
 	}
 	defer file.Close()
+
+	line_qty, err := countLinesFast(path)
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
 
 	decoder := json.NewDecoder(file)
 
@@ -83,15 +86,27 @@ func readAndTransformData(path string) (map[string]mmdbtype.Map, error) {
 }
 
 func main() {
-	fmt.Println("Transforming the database")
+	args := os.Args[1:]
+	fmt.Printf("Transforming the database")
 
-	ip_data, err := readAndTransformData("ipinfo_lite.json")
-
-	if err != nil {
-		println("Error leyendo y transformando el archivo")
+	input_path := "input.json"
+	if len(args) > 0 && args[0] != "" {
+		input_path = args[0]
 	}
 
-	writer(ip_data)
+	ip_data, err := readAndTransformData(input_path)
+
+	if err != nil {
+		println("Error reading and transforming the data")
+		return
+	}
+
+	output_path := "geoip.mmdb"
+	if len(args) > 1 && args[1] != "" {
+		output_path = args[1]
+	}
+
+	writer(ip_data, output_path)
 
 }
 
@@ -129,7 +144,7 @@ func countLinesFast(filePath string) (int, error) {
 	return count, nil
 }
 
-func writer(ip_data map[string]mmdbtype.Map) {
+func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 	writer, err := mmdbwriter.New(mmdbwriter.Options{
 		// "DatabaseType" is some arbitrary string describing the database.
 		// At MaxMind we use strings like "GeoIP2-City", "GeoIP2-Country", etc.
@@ -147,6 +162,7 @@ func writer(ip_data map[string]mmdbtype.Map) {
 
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 
 	fmt.Println("Inserting data into database")
@@ -170,20 +186,25 @@ func writer(ip_data map[string]mmdbtype.Map) {
 		bar.Add(1)
 	}
 
-	fh, err := os.Create("ip_conf.mmdb")
+	fh, err := os.Create(output_path)
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 	defer fh.Close()
 
 	_, err = writer.WriteTo(fh)
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 
 	if err := fh.Close(); err != nil {
 		log.Fatal(err)
+		return err
 	}
 
-	fmt.Println("users.mmdb has now been created")
+	fmt.Printf("s% has now been created\n", output_path)
+
+	return nil
 }
