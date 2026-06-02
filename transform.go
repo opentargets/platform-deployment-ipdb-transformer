@@ -23,7 +23,7 @@ type MyData struct {
 	ContinentCode string `json:"continent_code"`
 	Continent     string `json:continent`
 	ASN           string `json:asn`
-	AsName        string `json:as_name`
+	AsName        string `json:"as_name"`
 	AsDomain      string `json:"as_domain"`
 }
 
