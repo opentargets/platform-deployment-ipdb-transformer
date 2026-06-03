@@ -33,7 +33,7 @@ func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, 
 	reader := bytes.NewReader(buffer.Bytes())
 	decoder := json.NewDecoder(reader)
 
-	println("Transforming the data")
+	log.Println("Transforming the data")
 
 	bar := progressbar.Default(int64(line_qty))
 
@@ -142,12 +142,17 @@ func main() {
 	var reader = bytes.Buffer{}
 	var lineCount = -1
 
+	if len(args) == 0 {
+		log.Fatal("Missing source type argument.")
+	}
+	source = args[0]
+
 	switch source {
 	case "url":
-		if len(args) == 0 {
+		if len(args) < 1 {
 			log.Fatal("Missing url argument.")
 		}
-		url := args[0]
+		url := args[1]
 
 		urlReader, urlLineCount, err := readFromUrl(url)
 		reader = urlReader
@@ -158,8 +163,8 @@ func main() {
 		}
 	case "file":
 		input_path := "input.json"
-		if len(args) > 0 && args[0] != "" {
-			input_path = args[0]
+		if len(args) > 1 && args[1] != "" {
+			input_path = args[1]
 		}
 
 		fileReader, fileLineCount, err := readFromFile(input_path)
@@ -180,8 +185,8 @@ func main() {
 	}
 
 	output_path := "geoip.mmdb"
-	if len(args) > 1 && args[1] != "" {
-		output_path = args[1]
+	if len(args) > 2 && args[2] != "" {
+		output_path = args[2]
 	}
 
 	err = writer(ip_data, output_path)
