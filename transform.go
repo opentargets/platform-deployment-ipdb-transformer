@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"strings"
 
@@ -27,23 +29,9 @@ type MyData struct {
 	AsDomain      string `json:"as_domain"`
 }
 
-func readAndTransformData(path string) (map[string]mmdbtype.Map, error) {
-
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	defer file.Close()
-
-	line_qty, err := countLinesFast(path)
-
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	decoder := json.NewDecoder(file)
+func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, error) {
+	reader := bytes.NewReader(buffer.Bytes())
+	decoder := json.NewDecoder(reader)
 
 	println("Reading the data")
 
@@ -85,19 +73,108 @@ func readAndTransformData(path string) (map[string]mmdbtype.Map, error) {
 	return ip_data, nil
 }
 
-func main() {
-	args := os.Args[1:]
-	fmt.Printf("Transforming the database")
+func readFromFile(path string) (bytes.Buffer, int, error) {
 
-	input_path := "input.json"
-	if len(args) > 0 && args[0] != "" {
-		input_path = args[0]
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return bytes.Buffer{}, -1, err
+	}
+	defer file.Close()
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, file); err != nil {
+		log.Fatal(err)
 	}
 
-	ip_data, err := readAndTransformData(input_path)
+	line_qty, err := countLinesFast(path)
 
 	if err != nil {
-		println("Error reading and transforming the data")
+		fmt.Println(err)
+		return bytes.Buffer{}, -1, err
+	}
+
+	return buf, line_qty, nil
+}
+
+func readFromUrl(url string) (bytes.Buffer, int, error) {
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return bytes.Buffer{}, -1, fmt.Errorf("Error fetching the ip database from the url %s", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return bytes.Buffer{}, -1, fmt.Errorf("Error fetching the ip database from the url %d", resp.StatusCode)
+	}
+
+	gzipReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		return bytes.Buffer{}, -1, fmt.Errorf("Error uncompressing the fie %s", err)
+	}
+	defer gzipReader.Close()
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, gzipReader); err != nil {
+		return bytes.Buffer{}, -1, fmt.Errorf("Error creating a copy of the reader %s", err)
+	}
+
+	lineCount := bytes.Count(buf.Bytes(), []byte("\n"))
+
+	return buf, lineCount, nil
+
+}
+
+func main() {
+
+	args := os.Args[1:]
+	fmt.Printf("Transforming the database\n")
+
+	source := "url"
+
+	var reader = bytes.Buffer{}
+	var lineCount = -1
+
+	switch source {
+	case "url":
+		if len(args) == 0 {
+			println("Missing url argument.")
+			return
+		}
+		url := args[0]
+
+		urlReader, urlLineCount, err := readFromUrl(url)
+		reader = urlReader
+		lineCount = urlLineCount
+
+		if err != nil {
+			println(err)
+			return
+		}
+	case "file":
+		input_path := "input.json"
+		if len(args) > 0 && args[0] != "" {
+			input_path = args[0]
+		}
+
+		fileReader, fileLineCount, err := readFromFile(input_path)
+		reader = fileReader
+		lineCount = fileLineCount
+
+		if err != nil {
+			println(err)
+			return
+		}
+	default:
+		println("Source to read mmdb database not valid. Valid values 'file', 'url'")
+		return
+	}
+
+	ip_data, err := transformData(reader, lineCount)
+
+	if err != nil {
+		println(err)
 		return
 	}
 
