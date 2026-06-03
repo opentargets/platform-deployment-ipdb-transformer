@@ -33,7 +33,7 @@ func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, 
 	reader := bytes.NewReader(buffer.Bytes())
 	decoder := json.NewDecoder(reader)
 
-	println("Reading the data")
+	println("Transforming the data")
 
 	bar := progressbar.Default(int64(line_qty))
 
@@ -75,6 +75,8 @@ func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, 
 
 func readFromFile(path string) (bytes.Buffer, int, error) {
 
+	log.Println("Reading from file")
+
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println(err)
@@ -98,6 +100,8 @@ func readFromFile(path string) (bytes.Buffer, int, error) {
 }
 
 func readFromUrl(url string) (bytes.Buffer, int, error) {
+
+	log.Println("Reading from URL")
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -128,8 +132,10 @@ func readFromUrl(url string) (bytes.Buffer, int, error) {
 
 func main() {
 
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	args := os.Args[1:]
-	fmt.Printf("Transforming the database\n")
+	log.Println("Start transforming IP database")
 
 	source := "url"
 
@@ -139,8 +145,7 @@ func main() {
 	switch source {
 	case "url":
 		if len(args) == 0 {
-			println("Missing url argument.")
-			return
+			log.Fatal("Missing url argument.")
 		}
 		url := args[0]
 
@@ -149,8 +154,7 @@ func main() {
 		lineCount = urlLineCount
 
 		if err != nil {
-			println(err)
-			return
+			log.Fatal(err)
 		}
 	case "file":
 		input_path := "input.json"
@@ -163,19 +167,16 @@ func main() {
 		lineCount = fileLineCount
 
 		if err != nil {
-			println(err)
-			return
+			log.Fatal(err)
 		}
 	default:
-		println("Source to read mmdb database not valid. Valid values 'file', 'url'")
-		return
+		log.Fatal("Source to read mmdb database not valid. Valid values 'file', 'url'")
 	}
 
 	ip_data, err := transformData(reader, lineCount)
 
 	if err != nil {
-		println(err)
-		return
+		log.Fatal(err)
 	}
 
 	output_path := "geoip.mmdb"
@@ -183,7 +184,11 @@ func main() {
 		output_path = args[1]
 	}
 
-	writer(ip_data, output_path)
+	err = writer(ip_data, output_path)
+
+	if err != nil {
+		log.Fatalf("Error writing the file %s\n", err)
+	}
 
 }
 
@@ -238,11 +243,10 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 	})
 
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 
-	fmt.Println("Inserting data into database")
+	log.Println("Inserting data into database")
 
 	bar := progressbar.Default(int64(len(ip_data)))
 
@@ -265,23 +269,20 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 
 	fh, err := os.Create(output_path)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 	defer fh.Close()
 
 	_, err = writer.WriteTo(fh)
 	if err != nil {
-		log.Fatal(err)
 		return err
 	}
 
 	if err := fh.Close(); err != nil {
-		log.Fatal(err)
 		return err
 	}
 
-	fmt.Printf("s% has now been created\n", output_path)
+	log.Printf("%s has now been created\n", output_path)
 
 	return nil
 }
