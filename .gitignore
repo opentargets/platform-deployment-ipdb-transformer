@@ -1,2 +1,4 @@
 **/*.mmdb
 **/*.json
+
+targets/*
