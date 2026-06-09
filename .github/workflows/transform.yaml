@@ -1,0 +1,43 @@
+name: transform
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]"
+
+jobs:
+  push-to-gcp:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      packages: write
+      contents: read
+      attestations: write
+      id-token: write
+
+    steps:
+      - id: checkout
+        name: Check out repo
+        uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25" # The Go version to download (if necessary) and use.
+
+      - run: go run transform.go url https://ipinfo.io/data/ipinfo_lite.json.gz?token=${{ secrets.IP_INFO_TOKEN }} geoip.mmdb
+
+      - id: auth-google
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          token_format: access_token
+          project_id: "open-targets-eu-dev"
+          workload_identity_provider: projects/426265110888/locations/global/workloadIdentityPools/github-actions/providers/opentargets
+          service_account: github-actions@open-targets-eu-dev.iam.gserviceaccount.com
+          access_token_lifetime: 300s
+
+      - name: Upload to GCS
+        uses: google-github-actions/upload-cloud-storage@v3
+        with:
+          path: "geoip.mmdb"
+          destination: "open-targets-ops/observability"
