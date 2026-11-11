@@ -1,14 +1,12 @@
 # Open Targets Platform IP Database Transformation
 
-The IP Database Transformation tool transforms from IPInfo schema to Maxmind schema.
+The IP Database Transformation tool transforms from [IPInfo](https://ipinfo.io/) schema to [MaxMind](https://www.maxmind.com/en/geoip-databases) schema.
 
-Given That frafana alloy ip resolution works with Maxmind schema we get a database in IPInfo schema and transform it to Maxmind schema.
+Given That frafana alloy ip resolution works with MaxMind schema we get a database in IPInfo schema and transform it to MaxMind schema.
 
 ## Requirements.
 
 - [go](https://go.dev/) >= 1.25.0
-
-
 
 ## Usage
 
@@ -34,7 +32,7 @@ This is the list of commnads:
 
 ### Transform from file
 
-If you have a file with a IPInfo database you can use the `file` command. This command has two position arguments `database_path output`. The `database` is the path to the IPInfo database file and the `output` is the optional output path for the Maxmind database it's default value es `output.mmdb`. This results in the following command:
+If you have a file with a IPInfo database you can use the `file` command. This command has two position arguments `database_path output`. The `database` is the path to the IPInfo database file and the `output` is the optional output path for the MaxMind database it's default value es `output.mmdb`. This results in the following command:
 
 ``` bash
 ./ipdb_transformer file <database_path> <output>
@@ -42,7 +40,7 @@ If you have a file with a IPInfo database you can use the `file` command. This c
 
 ### Transform from url
 
-You can use the `url` command to transforma an IPInfo database from a valid url. This command has two position arguments `database_url output`. The `database` is the path to the IPInfo database file and the `output` is the optional local path for the Maxmind database it's default value es `output.mmdb`. This results in the following command:
+You can use the `url` command to transforma an IPInfo database from a valid url. This command has two position arguments `database_url output`. The `database` is the path to the IPInfo database file and the `output` is the optional local path for the MaxMind database it's default value es `output.mmdb`. This results in the following command:
 
 ``` bash
 ./ipdb_transformer url <database_url> <output>
