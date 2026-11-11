@@ -3,10 +3,10 @@ package cmd
 import "github.com/spf13/cobra"
 
 var urlCmd = &cobra.Command{
-	Use:     "url",
-	Aliases: []string{"f"},
+	Use:     "url file",
+	Aliases: []string{"u"},
 	Short:   "Transform json file from url to mmdb",
-	Long:    "pending..",
+	Long:    "Creates a Maxmind database with IP information using an url to directly fetch the database from IPInfo. The default output database name is 'output.mmdb'",
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var output_path string

@@ -6,7 +6,7 @@ var fileCmd = &cobra.Command{
 	Use:     "file",
 	Aliases: []string{"f"},
 	Short:   "Transform json file from local path to mmdb",
-	Long:    "pending..",
+	Long:    "Creates a Maxmind database with IP information using a file containing an IPInfo database.",
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var output_path string
