@@ -1,6 +1,10 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"log"
+
+	"github.com/spf13/cobra"
+)
 
 var fileCmd = &cobra.Command{
 	Use:     "file",
@@ -15,7 +19,9 @@ var fileCmd = &cobra.Command{
 		} else {
 			output_path = "output.mmdb"
 		}
-		fromFile(args[0], output_path)
+		if _, err := fromFile(args[0], output_path); err != nil {
+			log.Fatal(err)
+		}
 	},
 }
 

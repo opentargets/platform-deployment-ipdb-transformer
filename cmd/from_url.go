@@ -1,6 +1,10 @@
 package cmd
 
-import "github.com/spf13/cobra"
+import (
+	"log"
+
+	"github.com/spf13/cobra"
+)
 
 var urlCmd = &cobra.Command{
 	Use:     "url file",
@@ -15,7 +19,9 @@ var urlCmd = &cobra.Command{
 		} else {
 			output_path = "output.mmdb"
 		}
-		fromUrl(args[0], output_path)
+		if _, err := fromUrl(args[0], output_path); err != nil {
+			log.Fatal(err)
+		}
 	},
 }
 

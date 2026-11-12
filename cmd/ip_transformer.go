@@ -18,76 +18,58 @@ import (
 )
 
 type MyData struct {
-	Network       string `json:network`
+	Network       string `json:"network"`
 	CountryCode   string `json:"country_code"`
-	Country       string `json:country`
+	Country       string `json:"country"`
 	ContinentCode string `json:"continent_code"`
-	Continent     string `json:continent`
-	ASN           string `json:asn`
+	Continent     string `json:"continent"`
+	ASN           string `json:"asn"`
 	AsName        string `json:"as_name"`
 	AsDomain      string `json:"as_domain"`
 }
 
-func fromFile(input_path string, output string) (result string) {
+func fromFile(input_path string, output string) (string, error) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	log.Println("start transforming IP database")
 
-	var reader = bytes.Buffer{}
-	var lineCount = -1
-
-	fileReader, fileLineCount, err := readFromFile(input_path)
-	reader = fileReader
-	lineCount = fileLineCount
-
+	reader, lineCount, err := readFromFile(input_path)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("error reading the ip database from file: %w", err)
 	}
 
-	ip_data, err := transformData(reader, lineCount)
-
+	ipData, err := transformData(reader, lineCount)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("error transforming the ip database: %w", err)
 	}
 
-	err = writer(ip_data, output)
-
-	if err != nil {
-		log.Fatalf("error writing the file %s\n", err)
+	if err := writer(ipData, output); err != nil {
+		return "", fmt.Errorf("error writing the file: %w", err)
 	}
 
-	return "transformed file"
+	return "transformed file", nil
 }
 
-func fromUrl(url string, output string) (result string) {
+func fromUrl(url string, output string) (string, error) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	log.Println("start transforming IP database")
 
-	var reader = bytes.Buffer{}
-	var lineCount = -1
-
-	urlReader, urlLineCount, err := readFromUrl(url)
-	reader = urlReader
-	lineCount = urlLineCount
-
+	reader, lineCount, err := readFromUrl(url)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 
-	ip_data, err := transformData(reader, lineCount)
-
+	ipData, err := transformData(reader, lineCount)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("error transforming the ip database: %w", err)
 	}
 
-	err = writer(ip_data, output)
-
-	if err != nil {
-		log.Fatalf("error writing the file %s\n", err)
+	if err := writer(ipData, output); err != nil {
+		return "", fmt.Errorf("error writing the file: %w", err)
 	}
 
-	return "transformed url"
+	return "transformed url", nil
 }
 
 func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, error) {
@@ -143,7 +125,7 @@ func readFromFile(path string) (bytes.Buffer, int, error) {
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, file); err != nil {
-		log.Fatal(err)
+		return bytes.Buffer{}, -1, err
 	}
 
 	line_qty, err := countLinesFast(path)
@@ -172,7 +154,7 @@ func readFromUrl(url string) (bytes.Buffer, int, error) {
 
 	gzipReader, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return bytes.Buffer{}, -1, fmt.Errorf("error uncompressing the fie %s", err)
+		return bytes.Buffer{}, -1, fmt.Errorf("error uncompressing the file: %w", err)
 	}
 	defer gzipReader.Close()
 
@@ -252,10 +234,10 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 		}
 		_, network, err := net.ParseCIDR(cidr2)
 		if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("invalid network %q: %w", cidr, err)
 		}
 		if err := writer.Insert(network, data); err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("error inserting network %q: %w", cidr, err)
 		}
 	}
 
