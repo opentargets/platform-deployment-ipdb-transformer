@@ -32,6 +32,36 @@ Example:
 
 IPv4 networks must include an explicit prefix length; a bare IPv4 address is treated as a `/32` network. IPv6 networks must include an explicit prefix length.
 
+## Output format
+
+The output is a MaxMind database (`.mmdb`) with the database type `GeoIP2-Country`. It supports both IPv4 and IPv6 networks. Each network contains the following data:
+
+```json
+{
+  "continent": {
+    "code": "OC",
+    "names": {
+      "en": "Oceania"
+    }
+  },
+  "country": {
+    "iso_code": "AU",
+    "names": {
+      "en": "Australia"
+    }
+  }
+}
+```
+
+| Output path | Input field |
+| --- | --- |
+| `continent.code` | `continent_code` |
+| `continent.names.en` | `continent` |
+| `country.iso_code` | `country_code` |
+| `country.names.en` | `country` |
+
+The ASN fields (`asn`, `as_name`, and `as_domain`) are not included in the output database.
+
 ## Usage
 
 To build the application you just need to run `make build` or just `make`. And to clear to artifacts you can use `make clean`.
