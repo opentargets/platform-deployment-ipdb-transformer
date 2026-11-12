@@ -15,7 +15,6 @@ import (
 
 	"github.com/maxmind/mmdbwriter"
 	"github.com/maxmind/mmdbwriter/mmdbtype"
-	"github.com/schollz/progressbar/v3"
 )
 
 type MyData struct {
@@ -32,7 +31,7 @@ type MyData struct {
 func fromFile(input_path string, output string) (result string) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	log.Println("Start transforming IP database")
+	log.Println("start transforming IP database")
 
 	var reader = bytes.Buffer{}
 	var lineCount = -1
@@ -54,7 +53,7 @@ func fromFile(input_path string, output string) (result string) {
 	err = writer(ip_data, output)
 
 	if err != nil {
-		log.Fatalf("Error writing the file %s\n", err)
+		log.Fatalf("error writing the file %s\n", err)
 	}
 
 	return "transformed file"
@@ -63,7 +62,7 @@ func fromFile(input_path string, output string) (result string) {
 func fromUrl(url string, output string) (result string) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
-	log.Println("Start transforming IP database")
+	log.Println("start transforming IP database")
 
 	var reader = bytes.Buffer{}
 	var lineCount = -1
@@ -85,7 +84,7 @@ func fromUrl(url string, output string) (result string) {
 	err = writer(ip_data, output)
 
 	if err != nil {
-		log.Fatalf("Error writing the file %s\n", err)
+		log.Fatalf("error writing the file %s\n", err)
 	}
 
 	return "transformed url"
@@ -95,9 +94,7 @@ func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, 
 	reader := bytes.NewReader(buffer.Bytes())
 	decoder := json.NewDecoder(reader)
 
-	log.Println("Transforming the data")
-
-	bar := progressbar.Default(int64(line_qty))
+	log.Println("transforming the data to MaxMind schema")
 
 	ip_data := make(map[string]mmdbtype.Map)
 
@@ -113,8 +110,6 @@ func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, 
 			fmt.Println(err)
 			return nil, err
 		}
-		// fmt.Printf("the data n %s, c %s, n %s, c %s \n", data.Country, data.CountryCode, data.Continent, data.ContinentCode)
-		bar.Add(1)
 
 		//transform into mmdbtype
 		ip_data[data.Network] = mmdbtype.Map{
@@ -137,7 +132,7 @@ func transformData(buffer bytes.Buffer, line_qty int) (map[string]mmdbtype.Map, 
 
 func readFromFile(path string) (bytes.Buffer, int, error) {
 
-	log.Println("Reading from file")
+	log.Println("reading from file")
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -163,27 +158,27 @@ func readFromFile(path string) (bytes.Buffer, int, error) {
 
 func readFromUrl(url string) (bytes.Buffer, int, error) {
 
-	log.Println("Reading from URL")
+	log.Println("reading from URL")
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return bytes.Buffer{}, -1, fmt.Errorf("Error fetching the ip database from the url %s", err)
+		return bytes.Buffer{}, -1, fmt.Errorf("error fetching the ip database from the url %s", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return bytes.Buffer{}, -1, fmt.Errorf("Error fetching the ip database from the url %d", resp.StatusCode)
+		return bytes.Buffer{}, -1, fmt.Errorf("error fetching the ip database from the url %d", resp.StatusCode)
 	}
 
 	gzipReader, err := gzip.NewReader(resp.Body)
 	if err != nil {
-		return bytes.Buffer{}, -1, fmt.Errorf("Error uncompressing the fie %s", err)
+		return bytes.Buffer{}, -1, fmt.Errorf("error uncompressing the fie %s", err)
 	}
 	defer gzipReader.Close()
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, gzipReader); err != nil {
-		return bytes.Buffer{}, -1, fmt.Errorf("Error creating a copy of the reader %s", err)
+		return bytes.Buffer{}, -1, fmt.Errorf("error creating a copy of the reader %s", err)
 	}
 
 	lineCount := bytes.Count(buf.Bytes(), []byte("\n"))
@@ -235,7 +230,7 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 		// "Description" is a map where the keys are language codes and the
 		// values are descriptions of the database in that language.
 		Description: map[string]string{
-			"en": "My database of IP data",
+			"en": "Opentargets database of IP data",
 		},
 
 		// "IPVersion" can be either 4 or 6.
@@ -246,9 +241,7 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 		return err
 	}
 
-	log.Println("Inserting data into database")
-
-	bar := progressbar.Default(int64(len(ip_data)))
+	log.Println("writing data into database")
 
 	for cidr, data := range ip_data {
 		var cidr2 = ""
@@ -264,7 +257,6 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 		if err := writer.Insert(network, data); err != nil {
 			log.Fatal(err)
 		}
-		bar.Add(1)
 	}
 
 	fh, err := os.Create(output_path)
@@ -282,7 +274,7 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 		return err
 	}
 
-	log.Printf("%s has now been created\n", output_path)
+	log.Printf("the %s database has now been created\n", output_path)
 
 	return nil
 }
