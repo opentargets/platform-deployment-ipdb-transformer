@@ -1,5 +1,7 @@
 # Open Targets Platform IP Database Transformation
 
+[![ci](https://github.com/opentargets/platform-deployment-ipdb-transformer/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/opentargets/platform-deployment-ipdb-transformer/actions/workflows/ci.yaml?query=branch%3Amain)
+
 The IP Database Transformation tool transforms from [IPInfo](https://ipinfo.io/) schema to [MaxMind](https://www.maxmind.com/en/geoip-databases) schema.
 
 Given That frafana alloy ip resolution works with MaxMind schema we get a database in IPInfo schema and transform it to MaxMind schema.
