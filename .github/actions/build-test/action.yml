@@ -1,0 +1,29 @@
+name: Build and test
+description: Set up Go, build the module and run the test suite
+
+inputs:
+  go-version:
+    description: Go version to download and use
+    required: false
+    default: "1.25"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: true
+
+    - name: Build
+      shell: bash
+      run: go build -v ./...
+
+    - name: Vet
+      shell: bash
+      run: go vet ./...
+
+    - name: Test
+      shell: bash
+      run: go test -race -cover ./...
