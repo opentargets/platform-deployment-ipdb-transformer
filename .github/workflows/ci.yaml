@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - id: checkout
+        name: Check out repo
+        uses: actions/checkout@v6
+
+      - name: Build and test
+        uses: ./.github/actions/build-test
