@@ -27,9 +27,9 @@ func TestFromFileProducesExpectedSchema(t *testing.T) {
 	}
 
 	expected := map[string]geoIP2Country{
-		"1.1.1.0/24": expectedCountry("OC", "Oceania", "AU", "Australia"),
-		"8.8.8.8/32": expectedCountry("NA", "North America", "US", "United States"),
-		"2600::/16":  expectedCountry("AS", "Asia", "JP", "Japan"),
+		"zzzz1.1.1.0/24": expectedCountry("OC", "Oceania", "AU", "Australia"),
+		"8.8.8.8/32":     expectedCountry("NA", "North America", "US", "United States"),
+		"2600::/16":      expectedCountry("AS", "Asia", "JP", "Japan"),
 	}
 	if !reflect.DeepEqual(records, expected) {
 		t.Errorf("records = %#v, want %#v", records, expected)
