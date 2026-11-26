@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -203,6 +204,26 @@ func countLinesFast(filePath string) (int, error) {
 	return count, nil
 }
 
+// networkCIDR returns the CIDR notation to use for a network entry. Networks
+// with an explicit prefix length are used as they are and bare IPv4 addresses
+// are treated as /32 networks. IPv6 networks must carry an explicit prefix
+// length, otherwise the address would silently become a much wider network.
+func networkCIDR(cidr string) (string, error) {
+	if strings.Contains(cidr, "/") {
+		return cidr, nil
+	}
+
+	ip := net.ParseIP(cidr)
+	if ip == nil {
+		return "", fmt.Errorf("invalid network %q", cidr)
+	}
+	if ip.To4() != nil {
+		return cidr + "/32", nil
+	}
+
+	return "", fmt.Errorf("invalid network %q: IPv6 networks must include an explicit prefix length", cidr)
+}
+
 func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 	writer, err := mmdbwriter.New(mmdbwriter.Options{
 		// "DatabaseType" is some arbitrary string describing the database.
@@ -225,20 +246,30 @@ func writer(ip_data map[string]mmdbtype.Map, output_path string) error {
 
 	log.Println("writing data into database")
 
+	skipped := 0
+
 	for cidr, data := range ip_data {
-		var cidr2 = ""
-		if strings.Contains(cidr, "/") {
-			cidr2 = cidr
-		} else {
-			cidr2 = cidr + "/32"
+		parsed_cidr, err := networkCIDR(cidr)
+		if err != nil {
+			return err
 		}
-		_, network, err := net.ParseCIDR(cidr2)
+		_, network, err := net.ParseCIDR(parsed_cidr)
 		if err != nil {
 			return fmt.Errorf("invalid network %q: %w", cidr, err)
 		}
 		if err := writer.Insert(network, data); err != nil {
+			var reservedErr *mmdbwriter.ReservedNetworkError
+			if errors.As(err, &reservedErr) {
+				log.Printf("skipping reserved network %q: %v", cidr, err)
+				skipped++
+				continue
+			}
 			return fmt.Errorf("error inserting network %q: %w", cidr, err)
 		}
+	}
+
+	if skipped > 0 {
+		log.Printf("skipped %d reserved network(s) not included in output database", skipped)
 	}
 
 	fh, err := os.Create(output_path)

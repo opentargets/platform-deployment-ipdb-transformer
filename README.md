@@ -34,6 +34,8 @@ Example:
 
 IPv4 networks must include an explicit prefix length; a bare IPv4 address is treated as a `/32` network. IPv6 networks must include an explicit prefix length.
 
+Networks that belong to the IANA special-purpose address registries, such as `2001:4:112::/48` or `2001:db8::/32`, are reserved and are not published. They are skipped with a warning and are not included in the output database.
+
 ## Output format
 
 The output is a MaxMind database (`.mmdb`) with the database type `GeoIP2-Country`. It supports both IPv4 and IPv6 networks. Each network contains the following data:

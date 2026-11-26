@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/oschwald/maxminddb-golang/v2"
 )
 
@@ -67,6 +68,23 @@ func expectedCountry(continentCode, continent, countryCode, country string) geoI
 	record.Country.ISOCode = countryCode
 	record.Country.Names = map[string]string{"en": country}
 	return record
+}
+
+func countryRecord(continentCode, continent, countryCode, country string) mmdbtype.Map {
+	return mmdbtype.Map{
+		"continent": mmdbtype.Map{
+			"code": mmdbtype.String(continentCode),
+			"names": mmdbtype.Map{
+				"en": mmdbtype.String(continent),
+			},
+		},
+		"country": mmdbtype.Map{
+			"iso_code": mmdbtype.String(countryCode),
+			"names": mmdbtype.Map{
+				"en": mmdbtype.String(country),
+			},
+		},
+	}
 }
 
 func gzipContent(t *testing.T, content string) []byte {
