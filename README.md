@@ -32,9 +32,25 @@ Example:
 {"network":"8.8.8.8","country_code":"US","country":"United States","continent_code":"NA","continent":"North America","asn":"AS15169","as_name":"GOOGLE","as_domain":"google.com"}
 ```
 
-IPv4 networks must include an explicit prefix length; a bare IPv4 address is treated as a `/32` network. IPv6 networks must include an explicit prefix length.
+IPv4 networks must include an explicit prefix length; a bare IPv4 address is treated as a `/32` network. A bare IPv6 address is treated as a `/128` network.
 
-Networks that belong to the IANA special-purpose address registries, such as `2001:4:112::/48` or `2001:db8::/32`, are reserved and are not published. They are skipped with a warning and are not included in the output database.
+Networks that belong to the IANA special-purpose address registries, such as `2001:4:112::/48` or `2001:db8::/32`, are reserved and are not published.
+
+### Skipped records
+
+The source of the data is not under our control, so records that cannot be published are skipped instead of failing the transformation. The skipped records are counted by reason and reported at the end of the run:
+
+| Reason | Description |
+| --- | --- |
+| `malformed` | The JSON line could not be decoded. |
+| `invalid` | The network is not a valid IP address or CIDR. |
+| `reserved` | The network belongs to an IANA special-purpose address registry. |
+| `aliased` | The network belongs to an aliased range, e.g. Teredo or 6to4. |
+
+Every skipped record is also logged with its reason. The transformation fails, without writing the output database, when:
+
+- the source data contains no records, or none of its records could be published;
+- the percentage of skipped records exceeds `--max-skip-rate`.
 
 ## Output format
 
@@ -107,6 +123,18 @@ You can generate shell completions by running one of these three options:
 
 ```
 $ source <(./ipdb_transformer completion {bash,fish,zsh})
+```
+
+### Options
+
+Both commands accept the following option:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--max-skip-rate` | `1` | Maximum percentage of source records that may be skipped before the transformation fails. Use `0` to fail on any skipped record and a negative value to disable the check. |
+
+``` bash
+./ipdb_transformer url <database_url> <output> --max-skip-rate 0.1
 ```
 
 ## Copyright

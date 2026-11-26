@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"net/netip"
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -12,7 +13,7 @@ func TestFromFileProducesExpectedSchema(t *testing.T) {
 	input := writeInputFile(t, sampleJSONL)
 	output := filepath.Join(t.TempDir(), "output.mmdb")
 
-	if _, err := fromFile(input, output); err != nil {
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromFile returned an error: %v", err)
 	}
 
@@ -41,7 +42,7 @@ func TestFromFileExcludesASNFields(t *testing.T) {
 	input := writeInputFile(t, sampleJSONL)
 	output := filepath.Join(t.TempDir(), "output.mmdb")
 
-	if _, err := fromFile(input, output); err != nil {
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromFile returned an error: %v", err)
 	}
 
@@ -69,7 +70,7 @@ func TestFromFileAllowsMissingOptionalFields(t *testing.T) {
 	input := writeInputFile(t, `{"network":"93.184.216.0/24"}`+"\n")
 	output := filepath.Join(t.TempDir(), "output.mmdb")
 
-	if _, err := fromFile(input, output); err != nil {
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromFile returned an error: %v", err)
 	}
 
@@ -89,7 +90,7 @@ func TestFromFileSkipsReservedNetworks(t *testing.T) {
 		`{"network":"1.1.1.0/24","country_code":"AU","country":"Australia","continent_code":"OC","continent":"Oceania"}`+"\n")
 	output := filepath.Join(t.TempDir(), "output.mmdb")
 
-	if _, err := fromFile(input, output); err != nil {
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromFile returned an error: %v", err)
 	}
 
@@ -106,6 +107,66 @@ func TestFromFileSkipsReservedNetworks(t *testing.T) {
 	}
 }
 
+func TestFromFileSkipsMalformedRecords(t *testing.T) {
+	t.Parallel()
+
+	input := writeInputFile(t, `{"network":"1.1.1.0/24","country_code":"AU","country":"Australia","continent_code":"OC","continent":"Oceania"}`+"\n"+
+		"not json\n")
+	output := filepath.Join(t.TempDir(), "output.mmdb")
+
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
+		t.Fatalf("fromFile returned an error: %v", err)
+	}
+
+	_, records := readDatabase(t, output)
+	expected := map[string]geoIP2Country{
+		"1.1.1.0/24": expectedCountry("OC", "Oceania", "AU", "Australia"),
+	}
+	if !reflect.DeepEqual(records, expected) {
+		t.Errorf("records = %#v, want %#v", records, expected)
+	}
+}
+
+func TestFromFileAcceptsBareIPv6Address(t *testing.T) {
+	t.Parallel()
+
+	input := writeInputFile(t, `{"network":"2a00:2000:0:8080::66","country_code":"FR","country":"France","continent_code":"EU","continent":"Europe"}`+"\n")
+	output := filepath.Join(t.TempDir(), "output.mmdb")
+
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
+		t.Fatalf("fromFile returned an error: %v", err)
+	}
+
+	_, records := readDatabase(t, output)
+	expected := map[string]geoIP2Country{
+		"2a00:2000:0:8080::66/128": expectedCountry("EU", "Europe", "FR", "France"),
+	}
+	if !reflect.DeepEqual(records, expected) {
+		t.Errorf("records = %#v, want %#v", records, expected)
+	}
+}
+
+func TestFromFileReturnsErrorWhenSkipRateIsExceeded(t *testing.T) {
+	t.Parallel()
+
+	input := writeInputFile(t, `{"network":"2001:4:112::/48","country_code":"US","country":"United States","continent_code":"NA","continent":"North America"}`+"\n"+
+		`{"network":"2001:db8::/32","country_code":"US","country":"United States","continent_code":"NA","continent":"North America"}`+"\n"+
+		`{"network":"1.1.1.0/24","country_code":"AU","country":"Australia","continent_code":"OC","continent":"Oceania"}`+"\n")
+	output := filepath.Join(t.TempDir(), "output.mmdb")
+
+	_, err := fromFile(input, output, 1)
+	if err == nil {
+		t.Fatal("fromFile returned no error")
+	}
+	if !strings.Contains(err.Error(), "exceeds the maximum allowed skip rate") {
+		t.Errorf("error = %q, want it to contain %q", err, "exceeds the maximum allowed skip rate")
+	}
+
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Errorf("output file exists, want it not to be created: %v", err)
+	}
+}
+
 func TestFromFileReturnsErrors(t *testing.T) {
 	t.Parallel()
 
@@ -119,22 +180,25 @@ func TestFromFileReturnsErrors(t *testing.T) {
 			name:    "malformed JSON",
 			content: "not json\n",
 			output:  func(dir string) string { return filepath.Join(dir, "output.mmdb") },
+			wantErr: "no usable networks",
 		},
 		{
 			name:    "invalid network",
 			content: `{"network":"not-an-ip"}` + "\n",
 			output:  func(dir string) string { return filepath.Join(dir, "output.mmdb") },
+			wantErr: "no usable networks",
 		},
 		{
 			name:    "empty network",
 			content: `{"network":""}` + "\n",
 			output:  func(dir string) string { return filepath.Join(dir, "output.mmdb") },
+			wantErr: "no usable networks",
 		},
 		{
-			name:    "bare IPv6 address",
+			name:    "bare IPv6 address in a reserved range",
 			content: `{"network":"2001:db8::"}` + "\n",
 			output:  func(dir string) string { return filepath.Join(dir, "output.mmdb") },
-			wantErr: "prefix length",
+			wantErr: "no usable networks",
 		},
 	}
 
@@ -145,7 +209,7 @@ func TestFromFileReturnsErrors(t *testing.T) {
 			input := writeInputFile(t, tt.content)
 			output := tt.output(t.TempDir())
 
-			_, err := fromFile(input, output)
+			_, err := fromFile(input, output, skipRateDisabled)
 			if err == nil {
 				t.Fatal("fromFile returned no error")
 			}
@@ -160,7 +224,7 @@ func TestFromFileReturnsErrorForMissingInput(t *testing.T) {
 	t.Parallel()
 
 	output := filepath.Join(t.TempDir(), "output.mmdb")
-	if _, err := fromFile(filepath.Join(t.TempDir(), "missing.jsonl"), output); err == nil {
+	if _, err := fromFile(filepath.Join(t.TempDir(), "missing.jsonl"), output, skipRateDisabled); err == nil {
 		t.Fatal("fromFile returned no error")
 	}
 }
@@ -171,27 +235,27 @@ func TestFromFileReturnsErrorForInvalidOutput(t *testing.T) {
 	input := writeInputFile(t, sampleJSONL)
 	output := filepath.Join(t.TempDir(), "missing", "output.mmdb")
 
-	if _, err := fromFile(input, output); err == nil {
+	if _, err := fromFile(input, output, skipRateDisabled); err == nil {
 		t.Fatal("fromFile returned no error")
 	}
 }
 
-func TestFromFileAcceptsEmptyInput(t *testing.T) {
+func TestFromFileReturnsErrorForEmptyInput(t *testing.T) {
 	t.Parallel()
 
 	input := writeInputFile(t, "")
 	output := filepath.Join(t.TempDir(), "output.mmdb")
 
-	if _, err := fromFile(input, output); err != nil {
-		t.Fatalf("fromFile returned an error: %v", err)
+	_, err := fromFile(input, output, skipRateDisabled)
+	if err == nil {
+		t.Fatal("fromFile returned no error")
+	}
+	if !strings.Contains(err.Error(), "no records") {
+		t.Errorf("error = %q, want it to contain %q", err, "no records")
 	}
 
-	reader, records := readDatabase(t, output)
-	if reader.Metadata.DatabaseType != "GeoIP2-Country" {
-		t.Errorf("database type = %q, want %q", reader.Metadata.DatabaseType, "GeoIP2-Country")
-	}
-	if len(records) != 0 {
-		t.Errorf("records = %#v, want empty", records)
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Errorf("output file exists, want it not to be created: %v", err)
 	}
 }
 
@@ -201,7 +265,7 @@ func TestFromFileLastDuplicateNetworkWins(t *testing.T) {
 	input := writeInputFile(t, `{"network":"93.184.216.0/24","country_code":"US","country":"United States","continent_code":"NA","continent":"North America"}`+"\n"+`{"network":"93.184.216.0/24","country_code":"CA","country":"Canada","continent_code":"NA","continent":"North America"}`+"\n")
 	output := filepath.Join(t.TempDir(), "output.mmdb")
 
-	if _, err := fromFile(input, output); err != nil {
+	if _, err := fromFile(input, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromFile returned an error: %v", err)
 	}
 

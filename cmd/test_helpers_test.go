@@ -16,6 +16,10 @@ const sampleJSONL = `{"network":"1.1.1.0/24","country_code":"AU","country":"Aust
 {"network":"2600::/16","country_code":"JP","country":"Japan","continent_code":"AS","continent":"Asia","asn":"AS7018","as_name":"NTT","as_domain":"ntt.com"}
 `
 
+// skipRateDisabled disables the skip rate check so that tests with
+// intentionally skipped records are not affected by it.
+const skipRateDisabled = -1.0
+
 type geoIP2Country struct {
 	Continent struct {
 		Code  string            `maxminddb:"code"`
