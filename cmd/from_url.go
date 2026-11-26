@@ -19,7 +19,7 @@ var urlCmd = &cobra.Command{
 		} else {
 			output_path = "output.mmdb"
 		}
-		if _, err := fromUrl(args[0], output_path); err != nil {
+		if _, err := fromUrl(args[0], output_path, maxSkipRate); err != nil {
 			log.Fatal(err)
 		}
 	},

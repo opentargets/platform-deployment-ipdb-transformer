@@ -18,7 +18,7 @@ func TestFromURLProducesExpectedSchema(t *testing.T) {
 	defer server.Close()
 
 	output := filepath.Join(t.TempDir(), "output.mmdb")
-	if _, err := fromUrl(server.URL, output); err != nil {
+	if _, err := fromUrl(server.URL, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromUrl returned an error: %v", err)
 	}
 
@@ -67,7 +67,7 @@ func TestFromURLReturnsErrors(t *testing.T) {
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write(gzipContent(t, "not json\n"))
 			},
-			wantErrMsg: "transforming",
+			wantErrMsg: "no usable networks",
 		},
 		{
 			name: "corrupt gzip",
@@ -86,7 +86,7 @@ func TestFromURLReturnsErrors(t *testing.T) {
 			defer server.Close()
 
 			output := filepath.Join(t.TempDir(), "output.mmdb")
-			_, err := fromUrl(server.URL, output)
+			_, err := fromUrl(server.URL, output, skipRateDisabled)
 			if err == nil {
 				t.Fatal("fromUrl returned no error")
 			}
@@ -97,7 +97,7 @@ func TestFromURLReturnsErrors(t *testing.T) {
 	}
 }
 
-func TestFromURLAcceptsEmptyGzipResponse(t *testing.T) {
+func TestFromURLReturnsErrorForEmptyGzipResponse(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -106,16 +106,40 @@ func TestFromURLAcceptsEmptyGzipResponse(t *testing.T) {
 	defer server.Close()
 
 	output := filepath.Join(t.TempDir(), "output.mmdb")
-	if _, err := fromUrl(server.URL, output); err != nil {
+	_, err := fromUrl(server.URL, output, skipRateDisabled)
+	if err == nil {
+		t.Fatal("fromUrl returned no error")
+	}
+	if !strings.Contains(err.Error(), "no records") {
+		t.Errorf("error = %q, want it to contain %q", err, "no records")
+	}
+}
+
+func TestFromURLSkipsReservedNetworks(t *testing.T) {
+	t.Parallel()
+
+	content := `{"network":"2001:4:112::/48","country_code":"US","country":"United States","continent_code":"NA","continent":"North America"}` + "\n" +
+		`{"network":"1.1.1.0/24","country_code":"AU","country":"Australia","continent_code":"OC","continent":"Oceania"}` + "\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(gzipContent(t, content))
+	}))
+	defer server.Close()
+
+	output := filepath.Join(t.TempDir(), "output.mmdb")
+	if _, err := fromUrl(server.URL, output, skipRateDisabled); err != nil {
 		t.Fatalf("fromUrl returned an error: %v", err)
 	}
 
-	reader, records := readDatabase(t, output)
-	if reader.Metadata.DatabaseType != "GeoIP2-Country" {
-		t.Errorf("database type = %q, want %q", reader.Metadata.DatabaseType, "GeoIP2-Country")
+	_, records := readDatabase(t, output)
+	if _, ok := records["2001:4:112::/48"]; ok {
+		t.Error("reserved network 2001:4:112::/48 should not be in the database")
 	}
-	if len(records) != 0 {
-		t.Errorf("records = %#v, want empty", records)
+	expected := map[string]geoIP2Country{
+		"1.1.1.0/24": expectedCountry("OC", "Oceania", "AU", "Australia"),
+	}
+	if !reflect.DeepEqual(records, expected) {
+		t.Errorf("records = %#v, want %#v", records, expected)
 	}
 }
 
@@ -131,7 +155,7 @@ func TestFromURLPreservesQueryString(t *testing.T) {
 	defer server.Close()
 
 	output := filepath.Join(t.TempDir(), "output.mmdb")
-	if _, err := fromUrl(server.URL+"?token=secret", output); err != nil {
+	if _, err := fromUrl(server.URL+"?token=secret", output, skipRateDisabled); err != nil {
 		t.Fatalf("fromUrl returned an error: %v", err)
 	}
 }
@@ -144,7 +168,7 @@ func TestFromURLReturnsErrorForUnreachableServer(t *testing.T) {
 	server.Close()
 
 	output := filepath.Join(t.TempDir(), "output.mmdb")
-	if _, err := fromUrl(url, output); err == nil {
+	if _, err := fromUrl(url, output, skipRateDisabled); err == nil {
 		t.Fatal("fromUrl returned no error")
 	}
 }

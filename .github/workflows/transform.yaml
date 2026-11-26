@@ -27,7 +27,7 @@ jobs:
         with:
           go-version: "1.25"
 
-      - run: go run transform.go url https://ipinfo.io/data/ipinfo_lite.json.gz?token=${{ secrets.IP_INFO_TOKEN }} geoip.mmdb
+      - run: go run transform.go url https://ipinfo.io/data/ipinfo_lite.json.gz?token=${{ secrets.IP_INFO_TOKEN }} geoip.mmdb --max-skip-rate 0.1
 
       - id: auth-google
         name: Authenticate to Google Cloud
