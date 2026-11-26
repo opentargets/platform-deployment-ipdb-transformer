@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -81,6 +82,30 @@ func TestFromFileAllowsMissingOptionalFields(t *testing.T) {
 	}
 }
 
+func TestFromFileSkipsReservedNetworks(t *testing.T) {
+	t.Parallel()
+
+	input := writeInputFile(t, `{"network":"2001:4:112::/48","country_code":"US","country":"United States","continent_code":"NA","continent":"North America"}`+"\n"+
+		`{"network":"1.1.1.0/24","country_code":"AU","country":"Australia","continent_code":"OC","continent":"Oceania"}`+"\n")
+	output := filepath.Join(t.TempDir(), "output.mmdb")
+
+	if _, err := fromFile(input, output); err != nil {
+		t.Fatalf("fromFile returned an error: %v", err)
+	}
+
+	_, records := readDatabase(t, output)
+
+	if _, ok := records["2001:4:112::/48"]; ok {
+		t.Error("reserved network 2001:4:112::/48 should not be in the database")
+	}
+	expected := map[string]geoIP2Country{
+		"1.1.1.0/24": expectedCountry("OC", "Oceania", "AU", "Australia"),
+	}
+	if !reflect.DeepEqual(records, expected) {
+		t.Errorf("records = %#v, want %#v", records, expected)
+	}
+}
+
 func TestFromFileReturnsErrors(t *testing.T) {
 	t.Parallel()
 
@@ -88,6 +113,7 @@ func TestFromFileReturnsErrors(t *testing.T) {
 		name    string
 		content string
 		output  func(string) string
+		wantErr string
 	}{
 		{
 			name:    "malformed JSON",
@@ -108,6 +134,7 @@ func TestFromFileReturnsErrors(t *testing.T) {
 			name:    "bare IPv6 address",
 			content: `{"network":"2001:db8::"}` + "\n",
 			output:  func(dir string) string { return filepath.Join(dir, "output.mmdb") },
+			wantErr: "prefix length",
 		},
 	}
 
@@ -118,8 +145,12 @@ func TestFromFileReturnsErrors(t *testing.T) {
 			input := writeInputFile(t, tt.content)
 			output := tt.output(t.TempDir())
 
-			if _, err := fromFile(input, output); err == nil {
+			_, err := fromFile(input, output)
+			if err == nil {
 				t.Fatal("fromFile returned no error")
+			}
+			if tt.wantErr != "" && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error = %q, want it to contain %q", err, tt.wantErr)
 			}
 		})
 	}
